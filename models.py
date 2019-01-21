@@ -1,12 +1,5 @@
 import numpy
 numpy.random.seed(123)
-from sklearn import linear_model
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.svm import SVR
-from sklearn.preprocessing import StandardScaler
-import xgboost as xgb
-from sklearn import neighbors
-from sklearn.preprocessing import Normalizer
 
 from keras.models import Sequential
 from keras.models import Model as KerasModel
@@ -77,106 +70,6 @@ class Model(object):
         relative_err = numpy.absolute((y_val - guessed_sales) / y_val)
         result = numpy.sum(relative_err) / len(y_val)
         return result
-
-
-class LinearModel(Model):
-
-    def __init__(self, X_train, y_train, X_val, y_val):
-        super().__init__()
-        self.clf = linear_model.LinearRegression()
-        self.clf.fit(X_train, numpy.log(y_train))
-        print("Result on validation data: ", self.evaluate(X_val, y_val))
-
-    def guess(self, feature):
-        return numpy.exp(self.clf.predict(feature))
-
-
-class RF(Model):
-
-    def __init__(self, X_train, y_train, X_val, y_val):
-        super().__init__()
-        self.clf = RandomForestRegressor(n_estimators=200, verbose=True, max_depth=35, min_samples_split=2,
-                                         min_samples_leaf=1)
-        self.clf.fit(X_train, numpy.log(y_train))
-        print("Result on validation data: ", self.evaluate(X_val, y_val))
-
-    def guess(self, feature):
-        return numpy.exp(self.clf.predict(feature))
-
-
-class SVM(Model):
-
-    def __init__(self, X_train, y_train, X_val, y_val):
-        super().__init__()
-        self.X_train = X_train
-        self.y_train = y_train
-        self.__normalize_data()
-        self.clf = SVR(kernel='linear', degree=3, gamma='auto', coef0=0.0, tol=0.001,
-                       C=1.0, epsilon=0.1, shrinking=True, cache_size=200, verbose=False, max_iter=-1)
-
-        self.clf.fit(self.X_train, numpy.log(self.y_train))
-        print("Result on validation data: ", self.evaluate(X_val, y_val))
-
-    def __normalize_data(self):
-        self.scaler = StandardScaler()
-        self.X_train = self.scaler.fit_transform(self.X_train)
-
-    def guess(self, feature):
-        return numpy.exp(self.clf.predict(feature))
-
-
-class XGBoost(Model):
-
-    def __init__(self, X_train, y_train, X_val, y_val):
-        super().__init__()
-        dtrain = xgb.DMatrix(X_train, label=numpy.log(y_train))
-        evallist = [(dtrain, 'train')]
-        param = {'nthread': -1,
-                 'max_depth': 7,
-                 'eta': 0.02,
-                 'silent': 1,
-                 'objective': 'reg:linear',
-                 'colsample_bytree': 0.7,
-                 'subsample': 0.7}
-        num_round = 3000
-        self.bst = xgb.train(param, dtrain, num_round, evallist)
-        print("Result on validation data: ", self.evaluate(X_val, y_val))
-
-    def guess(self, feature):
-        dtest = xgb.DMatrix(feature)
-        return numpy.exp(self.bst.predict(dtest))
-
-
-class HistricalMedian(Model):
-
-    def __init__(self, X_train, y_train, X_val, y_val):
-        super().__init__()
-        self.history = {}
-        self.feature_index = [1, 2, 3, 4]
-        for x, y in zip(X_train, y_train):
-            key = tuple(x[self.feature_index])
-            self.history.setdefault(key, []).append(y)
-        print("Result on validation data: ", self.evaluate(X_val, y_val))
-
-    def guess(self, features):
-        features = numpy.array(features)
-        features = features[:, self.feature_index]
-        guessed_sales = [numpy.median(self.history[tuple(feature)]) for feature in features]
-        return numpy.array(guessed_sales)
-
-
-class KNN(Model):
-
-    def __init__(self, X_train, y_train, X_val, y_val):
-        super().__init__()
-        self.normalizer = Normalizer()
-        self.normalizer.fit(X_train)
-        self.clf = neighbors.KNeighborsRegressor(n_neighbors=10, weights='distance', p=1)
-        self.clf.fit(self.normalizer.transform(X_train), numpy.log(y_train))
-        print("Result on validation data: ", self.evaluate(self.normalizer.transform(X_val), y_val))
-
-    def guess(self, feature):
-        return numpy.exp(self.clf.predict(self.normalizer.transform(feature)))
 
 
 class NN_with_EntityEmbedding(Model):
